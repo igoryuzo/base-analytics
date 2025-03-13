@@ -32,13 +32,9 @@ export async function POST(req: NextRequest) {
   const baseUrl = new URL(req.url).origin;
   
   try {
-    // Validate the frame request
+    // Get request body - no validation in this simplified version
+    // For production, you should implement proper validation
     const body = await req.json();
-    const { isValid, message } = await sdk.verifyRequest(body);
-    
-    if (!isValid) {
-      return new NextResponse('Invalid frame request', { status: 400 });
-    }
 
     // Get analytics data from Dune
     const analyticsData = await getDuneAnalytics();
