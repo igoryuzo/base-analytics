@@ -52,17 +52,20 @@ function createFrameHtml({
 }
 
 export async function GET(req: NextRequest) {
-  const baseUrl = new URL(req.url).origin;
+  // Check for X-Forwarded-Host header (used by ngrok)
+  const xForwardedHost = req.headers.get('x-forwarded-host');
+  const xForwardedProto = req.headers.get('x-forwarded-proto') || 'https';
   
-  // Create a default fallback image URL if your service isn't publicly accessible yet
-  const fallbackImageUrl = "https://placehold.co/1200x630/0052FF/ffffff?text=Base+Analytics";
+  // Use X-Forwarded-Host if available (for ngrok), otherwise use the request URL
+  let baseUrl = new URL(req.url).origin;
+  if (xForwardedHost) {
+    baseUrl = `${xForwardedProto}://${xForwardedHost}`;
+  }
   
-  // Choose the image URL - use absolute URL for Warpcast validator
-  // If testing with ngrok, baseUrl will be your ngrok URL
-  // If running locally without ngrok, use the fallback image
-  const imageUrl = baseUrl.includes('localhost') 
-    ? fallbackImageUrl 
-    : `${baseUrl}/api/image`;
+  console.log('Base URL:', baseUrl);
+  
+  // Use a reliable image service that's known to work with Farcaster
+  const imageUrl = "https://assets.imgix.net/examples/kingfisher.jpg?w=1200&h=630&txt=Base%20Analytics&txtsize=64&txtclr=fff&txtalign=center,middle&txtfont=Avenir%20Next%20Demi,Bold&bg=0052FF&blend-mode=normal";
   
   // Initial frame
   const html = createFrameHtml({
@@ -82,7 +85,17 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const baseUrl = new URL(req.url).origin;
+  // Check for X-Forwarded-Host header (used by ngrok)
+  const xForwardedHost = req.headers.get('x-forwarded-host');
+  const xForwardedProto = req.headers.get('x-forwarded-proto') || 'https';
+  
+  // Use X-Forwarded-Host if available (for ngrok), otherwise use the request URL
+  let baseUrl = new URL(req.url).origin;
+  if (xForwardedHost) {
+    baseUrl = `${xForwardedProto}://${xForwardedHost}`;
+  }
+  
+  console.log('Base URL (POST):', baseUrl);
   
   try {
     // Get request body - simplified validation
@@ -94,16 +107,19 @@ export async function POST(req: NextRequest) {
     // Get analytics data from Dune
     const analyticsData = await getDuneAnalytics();
     
-    // Encode data for the image endpoint
+    // Format analytics data for display in the image
+    const totalTx = analyticsData.totalTxCount.toLocaleString();
+    const users = analyticsData.activeUsers.toLocaleString();
+    const gas = analyticsData.avgGasPrice;
+    
+    // Create text for the image
+    const imageText = encodeURIComponent(`Base Analytics: ${totalTx} Txs, ${users} Users, ${gas} Gwei`);
+    
+    // Use imgix.net which is known to work well with Farcaster
+    const imageUrl = `https://assets.imgix.net/examples/kingfisher.jpg?w=1200&h=630&txt=${imageText}&txtsize=48&txtclr=fff&txtalign=center,middle&txtfont=Avenir%20Next%20Demi,Bold&bg=0052FF&blend-mode=normal`;
+    
+    // Encode data for state
     const encodedData = encodeURIComponent(JSON.stringify(analyticsData));
-    
-    // Create fallback image URL
-    const fallbackImageUrl = "https://placehold.co/1200x630/0052FF/ffffff?text=Base+Analytics+Updated";
-    
-    // Choose the image URL - use absolute URL for Warpcast validator
-    const imageUrl = baseUrl.includes('localhost') 
-      ? fallbackImageUrl 
-      : `${baseUrl}/api/image?data=${encodedData}`;
     
     // Create response with new frame
     const html = createFrameHtml({
@@ -124,12 +140,8 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Error processing frame request:', error);
     
-    // Error frame with fallback image
-    const fallbackErrorImage = "https://placehold.co/1200x630/FF0000/ffffff?text=Error+Loading+Data";
-    
-    const imageUrl = baseUrl.includes('localhost') 
-      ? fallbackErrorImage 
-      : `${baseUrl}/api/image?error=true`;
+    // Error frame with reliable image service
+    const imageUrl = "https://assets.imgix.net/examples/kingfisher.jpg?w=1200&h=630&txt=Error%20Loading%20Data&txtsize=64&txtclr=fff&txtalign=center,middle&txtfont=Avenir%20Next%20Demi,Bold&bg=FF0000&blend-mode=normal";
     
     const html = createFrameHtml({
       title: "Base Analytics Error",
